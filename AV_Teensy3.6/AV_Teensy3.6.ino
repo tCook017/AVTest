@@ -138,9 +138,9 @@ void loop() {
   newTelem += String(bmp.readAltitude(SEALEVELPRESSURE_HPA));
 
   telemFile = SD.open("telemFile.csv", FILE_WRITE);
-  if (telemFile != NULL) {
+  if (telemFile) {
     telemFile.println(newTelem);
-    dataFile.close();
+    telemFile.close();
     Serial.println("Wrote to SD");
   }
   else {
