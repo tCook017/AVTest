@@ -12,14 +12,13 @@
  *  Reduce/remove delays
  */
 
-const int SD_SELECT = BUILTIN_SDCARD;
-
 // The FXAS21002C and the FXOS8700 constitute the NXP 9-DOF board
 Adafruit_FXAS21002C gyro = Adafruit_FXAS21002C(0x0021002C);
 Adafruit_FXOS8700 accel = Adafruit_FXOS8700(0x8700A, 0x8700B);
 Adafruit_BMP3XX bmp = Adafruit_BMP3XX();
 
 File telemFile;
+char* telemFileName = "telem.csv";
 
 void setup() {
   Serial.begin(9600);
@@ -45,8 +44,8 @@ void setup() {
       Serial.println("Error detecting BMP388");
       initialized = false;
     }
-    if (!SD.begin(SD_SELECT)) {
-      Serial.println("Error detectig SD card");
+    if (!SD.begin(BUILTIN_SDCARD)) {
+      Serial.println("Error detecting SD card");
       initialized = false;
     }
   }
@@ -63,8 +62,16 @@ void setup() {
   Serial1.setTX(1);
   Serial1.begin(9600);
 
-  telemFile = SD.open("telemFile.csv", FILE_WRITE);
-  telemFile.close();
+  telemFile = SD.open(telemFileName, FILE_WRITE);
+  if (telemFile) {
+    telemFile.println("Test");
+    telemFile.close();
+  }
+  else {
+    Serial.println("Error writing to SD");
+  }
+  
+  Serial.println("Setup complete.");
 }
 
 void loop() {
@@ -137,7 +144,7 @@ void loop() {
   newTelem += String(bmp.pressure) + ',';
   newTelem += String(bmp.readAltitude(SEALEVELPRESSURE_HPA));
 
-  telemFile = SD.open("telemFile.csv", FILE_WRITE);
+  telemFile = SD.open(telemFileName, FILE_WRITE);
   if (telemFile) {
     telemFile.println(newTelem);
     telemFile.close();
