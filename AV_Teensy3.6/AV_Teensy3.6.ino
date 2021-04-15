@@ -1,3 +1,8 @@
+/* Useful Resources
+ * MPU6050 Datasheet - https://invensense.tdk.com/wp-content/uploads/2015/02/MPU-6000-Datasheet1.pdf
+ * 
+ */
+
 #include <Adafruit_Sensor.h>     // sensor abstraction library
 //#include <Adafruit_FXAS21002C.h> // gyroscope
 //#include <Adafruit_FXOS8700.h>   // accelerometer and magnetometer
@@ -21,8 +26,8 @@
 MPU6050 mpu(Wire);
 Adafruit_BMP3XX bmp = Adafruit_BMP3XX();
 
-File telemFile;
 char* telemFileName = "telem.csv";
+char* lordFileName = "telamen.csv";
 char loopIndex = 0;
 
 void setup() {
@@ -32,7 +37,9 @@ void setup() {
   Wire.setSDA(18);
   Wire.setSCL(19);
 
+  // Setup IMU (MPU6050) using TinyMPU6050 library.
   mpu.Initialize(); // Must do this after setting up Wire, since it internally calls 
+  mpu.RegisterWrite(MPU6050_ACCEL_CONFIG, 0x08);  // By default, TinyMPU6050 uses +-2g, we want +-16g
   Serial.println("Starting MPU6050 Calibration...");
   mpu.Calibrate();
   Serial.println("MPU6050 Calibration complete.");
@@ -64,10 +71,10 @@ void setup() {
     }
   }
 
-  // Setup IMU (MPU6050)
-  mpu.setAccelerometerRange(MPU6050_RANGE_16_G);
-  mpu.setGyroRange(MPU6050_RANGE_500_DEG);
-  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+  // Setup IMU (MPU6050) using Adafruit_MP6050 Library
+//  mpu.setAccelerometerRange(MPU6050_RANGE_16_G);
+//  mpu.setGyroRange(MPU6050_RANGE_500_DEG);
+//  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
 
   // Setup Barometer (BMP388)
   bmp.setTemperatureOversampling(BMP3_OVERSAMPLING_2X); // needed for the bmp388
@@ -75,20 +82,21 @@ void setup() {
   bmp.setIIRFilterCoeff(BMP3_IIR_FILTER_COEFF_3);
   bmp.setOutputDataRate(BMP3_ODR_50_HZ);
 
-  // Setup XBee
+  // Setup XBee UART
   Serial1.clear();
   Serial1.setRX(0);
   Serial1.setTX(1);
-  Serial1.begin(9600);
+  Serial1.begin(115200);
 
-  telemFile = SD.open(telemFileName, FILE_WRITE);
-  if (telemFile) {
-    telemFile.println("Test");
-    telemFile.close();
-  }
-  else {
-    Serial.println("Error writing to SD");
-  }
+  // Setup Lord IMU UART
+  Serial2.clear();
+  Serial2.setRX(9);
+  Serial2.setTX(10);
+  Serial2.begin(115200);
+
+  // Write to telemetry file, can use as a spacer to know what data is new.
+  writeToFile(telemFileName, "Test");
+  writeToFile(lordFileName, "Test");
 
   delay(500); // Delay for smoothing initial BMP
   Serial.println("Setup complete.");
@@ -98,11 +106,12 @@ void loop() {
 //  sensors_event_t gyro_event, accel_event;  // For old IMU setup
 //  gyro.getEvent(&gyro_event); // For FXAS21002C
 //  accel.getEvent(&accel_event, NULL); // For FXOS8700
-  sensors_event_t gyro_event, accel_event, temp_event;
+//  sensors_event_t gyro_event, accel_event, temp_event;  // For Arduino MPU library setup
 //  mpu.getEvent(&gyro_event, &accel_event, &temp_event);
   mpu.Execute();
   
   String newTelem = "";
+  String lordTelem = "";
 
   // Read time
   unsigned long timestamp = millis();
@@ -185,16 +194,21 @@ void loop() {
     loopIndex = -1; // Will be updated below to 0
   }
 
-  telemFile = SD.open(telemFileName, FILE_WRITE);
-  if (telemFile) {
-    telemFile.println(newTelem);
-    telemFile.close();
-    Serial.println("Wrote to SD");
-  }
-  else {
-    Serial.println("Error writing to SD");
-  }
+  writeToFile(telemFileName, newTelem);
+  writeToFile(lordFileName, lordTelem);
 
 //  delay(1000);
   ++loopIndex;
+}
+
+void writeToFile(char* fileName, String telem) {
+  File telemFile = SD.open(fileName, FILE_WRITE);
+  if (telemFile) {
+    telemFile.println(telem);
+    telemFile.close();
+    Serial.println("Wrote to " + fileName + " on SD");
+  }
+  else {
+    Serial.println("Error writing to " + fileName + " on SD");
+  }
 }
