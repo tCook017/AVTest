@@ -1,12 +1,8 @@
 /* Useful Resources
  * MPU6050 Datasheet - https://invensense.tdk.com/wp-content/uploads/2015/02/MPU-6000-Datasheet1.pdf
- * 
  */
 
 #include <Adafruit_Sensor.h>     // sensor abstraction library
-//#include <Adafruit_FXAS21002C.h> // gyroscope
-//#include <Adafruit_FXOS8700.h>   // accelerometer and magnetometer
-//#include <Adafruit_MPU6050.h>   // Another IMU
 #include <Adafruit_BMP3XX.h>     // barometric pressure sensor
 #include <SD.h>
 #include <TinyMPU6050.h>
@@ -16,13 +12,8 @@
 
 /* TODOs:
  *  Create version without Serial prints before flight (keep Serial1)
- *  Reduce/remove delays
  */
 
-// The FXAS21002C and the FXOS8700 constitute the NXP 9-DOF board
-//Adafruit_FXAS21002C gyro = Adafruit_FXAS21002C(0x0021002C);
-//Adafruit_FXOS8700 accel = Adafruit_FXOS8700(0x8700A, 0x8700B);
-//Adafruit_MPU6050 mpu;
 MPU6050 mpu(Wire);
 Adafruit_BMP3XX bmp = Adafruit_BMP3XX();
 
@@ -49,18 +40,6 @@ void setup() {
   while (!initialized) {
     delay(1000);
     initialized = true;
-//    if (!gyro.begin()) {
-//      Serial.println("Error detecting FXAS21002C");
-//      initialized = false;
-//    }
-//    if (!accel.begin(ACCEL_RANGE_8G)) {
-//      Serial.println("Error detecting FXOS8700");
-//      initialized = false;
-//    }
-//    if (!mpu.begin()) {
-//      Serial.println("Error detecting MPU6050");
-//      initialized = false;
-//    }
     if (!bmp.begin_I2C(0x77)) {
       Serial.println("Error detecting BMP388");
       initialized = false;
@@ -70,11 +49,6 @@ void setup() {
       initialized = false;
     }
   }
-
-  // Setup IMU (MPU6050) using Adafruit_MP6050 Library
-//  mpu.setAccelerometerRange(MPU6050_RANGE_16_G);
-//  mpu.setGyroRange(MPU6050_RANGE_500_DEG);
-//  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
 
   // Setup Barometer (BMP388)
   bmp.setTemperatureOversampling(BMP3_OVERSAMPLING_2X); // needed for the bmp388
@@ -96,109 +70,74 @@ void setup() {
 
   // Write to telemetry file, can use as a spacer to know what data is new.
   writeToFile(telemFileName, "Test");
-  writeToFile(lordFileName, "Test");
 
   delay(500); // Delay for smoothing initial BMP
   Serial.println("Setup complete.");
 }
 
 void loop() {
-//  sensors_event_t gyro_event, accel_event;  // For old IMU setup
-//  gyro.getEvent(&gyro_event); // For FXAS21002C
-//  accel.getEvent(&accel_event, NULL); // For FXOS8700
-//  sensors_event_t gyro_event, accel_event, temp_event;  // For Arduino MPU library setup
-//  mpu.getEvent(&gyro_event, &accel_event, &temp_event);
-  mpu.Execute();
-  
-  String newTelem = "";
-  String lordTelem = "";
+  mpu.Execute();  // Update values (which mpu.Get____() will read from) with new data.
 
-  // Read time
+  // Time
   unsigned long timestamp = millis();
-  Serial.print(timestamp);
-  Serial.print(" - ");
-  
-//  Serial1.print(timestamp);
-//  Serial1.print(',');
-//  newTelem += String(timestamp) + ',';
+  Serial.println(timestamp);
 
-  // Read gyroscope
-  Serial.print(gyro_event.gyro.x);
+  // Gyro x,y,z [degrees/second]
+  Serial.print("\t");
+  Serial.print(mpu.GetGyroX());
   Serial.print(", ");
-  Serial.print(gyro_event.gyro.y);
+  Serial.print(mpu.GetGyroY());
   Serial.print(", ");
-  Serial.println(gyro_event.gyro.z);
+  Serial.println(mpu.GetGyroZ());
 
-//  Serial1.print(gyro_event.gyro.x);
-//  Serial1.print(',');
-//  Serial1.print(gyro_event.gyro.y);
-//  Serial1.print(',');
-//  Serial1.print(gyro_event.gyro.z);
-//  newTelem += String(gyro_event.gyro.x) + ',';
-//  newTelem += String(gyro_event.gyro.y) + ',';
-//  newTelem += String(gyro_event.gyro.z);
-  
-  // Read accelerometer [m/s^2]
-  Serial.print(" - ");
-  Serial.print(accel_event.acceleration.x);
+  // Acceleration x,y,z [m/s²]
+  Serial.print("\t");
+  Serial.print(mpu.GetAccX());
   Serial.print(", ");
-  Serial.print(accel_event.acceleration.y);
+  Serial.print(mpu.GetAccY());
   Serial.print(", ");
-  Serial.println(accel_event.acceleration.z);
+  Serial.println(mpu.GetAccZ());
 
-//  Serial1.print(',');
-//  Serial1.print(accel_event.acceleration.x);
-//  Serial1.print(',');
-//  Serial1.print(accel_event.acceleration.y);
-//  Serial1.print(',');
-//  Serial1.print(accel_event.acceleration.z);
-//  newTelem += ',';
-//  newTelem += String(accel_event.acceleration.x) + ',';
-//  newTelem += String(accel_event.acceleration.y) + ',';
-//  newTelem += String(accel_event.acceleration.z);
+  // Attitude (yaw, pitch, roll in [degrees])
+  Serial.print("\t");
+  Serial.print(mpu.GetAngX());
+  Serial.print(", ");
+  Serial.print(mpu.GetAngY());
+  Serial.print(", ");
+  Serial.println(mpu.GetAngZ());
 
   // Read bmp tempature [C], pressure [hPa], and altitude [m]
-  Serial.print(" - ");
   Serial.print(bmp.temperature);  
   Serial.print(", ");
   Serial.print(bmp.pressure / 100);
   Serial.print(", ");
-  Serial.println(bmp.readAltitude(SEALEVELPRESSURE_HPA));  
+  Serial.println(bmp.readAltitude(SEALEVELPRESSURE_HPA));
 
-//  Serial1.print(',');
-//  Serial1.print(bmp.temperature);
-//  Serial1.print(',');
-//  Serial1.print(bmp.pressure); 
-//  Serial1.print(',');
-//  Serial1.println(bmp.readAltitude(SEALEVELPRESSURE_HPA));
-//  newTelem += ',';
-//  newTelem += String(bmp.temperature) + ',';
-//  newTelem += String(bmp.pressure) + ',';
-//  newTelem += String(bmp.readAltitude(SEALEVELPRESSURE_HPA));
+  String newTelem = String(timestamp) + ',';
+  newTelem += String(mpu.GetGyroX()) + ',';
+  newTelem += String(mpu.GetGyroY()) + ',';
+  newTelem += String(mpu.GetGyroZ());
+  newTelem += ',';
+  newTelem += String(mpu.GetAccX()) + ',';
+  newTelem += String(mpu.GetAccY()) + ',';
+  newTelem += String(mpu.GetAccZ());
+  newTelem += ',';
+  newTelem += String(bmp.temperature) + ',';
+  newTelem += String(bmp.pressure) + ',';
+  newTelem += String(bmp.readAltitude(SEALEVELPRESSURE_HPA));
+  writeToFile(telemFileName, newTelem);
 
+  // Send data over XBee once every 10 loops
   if (loopIndex >= 9) {
-    newTelem += String(timestamp) + ',';
-    newTelem += String(gyro_event.gyro.x) + ',';
-    newTelem += String(gyro_event.gyro.y) + ',';
-    newTelem += String(gyro_event.gyro.z);
-    newTelem += ',';
-    newTelem += String(accel_event.acceleration.x) + ',';
-    newTelem += String(accel_event.acceleration.y) + ',';
-    newTelem += String(accel_event.acceleration.z);
-    newTelem += ',';
-    newTelem += String(bmp.temperature) + ',';
-    newTelem += String(bmp.pressure) + ',';
-    newTelem += String(bmp.readAltitude(SEALEVELPRESSURE_HPA));
     Serial1.println(newTelem);
-    
     loopIndex = -1; // Will be updated below to 0
   }
-
-  writeToFile(telemFileName, newTelem);
-  writeToFile(lordFileName, lordTelem);
-
-//  delay(1000);
   ++loopIndex;
+
+  unsigned short lordAvailable = Serial2.available();
+  char lordTelem[lordAvailable];
+  Serial2.readBytes(lordTelem, lordAvailable);
+  writeToFile(lordFileName, ((String)lordTelem) + '\n');
 }
 
 void writeToFile(char* fileName, String telem) {
@@ -206,9 +145,9 @@ void writeToFile(char* fileName, String telem) {
   if (telemFile) {
     telemFile.println(telem);
     telemFile.close();
-    Serial.println("Wrote to " + fileName + " on SD");
+    Serial.println("Wrote to " + (String)fileName + " on SD");
   }
   else {
-    Serial.println("Error writing to " + fileName + " on SD");
+    Serial.println("Error writing to " + (String)fileName + " on SD");
   }
 }
